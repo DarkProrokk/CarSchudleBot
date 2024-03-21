@@ -37,14 +37,13 @@ class User(Base):
     id = Column(Integer, primary_key=True)
     tg_id = Column(String)
     tg_username = Column(String)
+    is_admin = Column(Boolean, default=False)
+    surname = Column(String, default=None, nullable=True)
 
-
-Base.metadata.create_all(engine)
 
 # Создаем сессию для взаимодействия с базой данных
 Session = sessionmaker(bind=engine)
 session = Session()
-#
 # # Пример добавления нового пользователя в базу данных
 # new_user = User(name='Alice')
 # session.add(new_user)
