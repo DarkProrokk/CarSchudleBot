@@ -5,13 +5,17 @@ from telebot import TeleBot
 from tools import get_user_by_tg_id
 from sqlalchemy.orm import Session
 import threading
+
 current_date = date.today()
 
 timers = {}
+
+
 def mark_intervals_not_busy(intervals, session):
     for interval in intervals:
         interval.is_selected = False
     session.commit()
+
 
 def handle_day(message, sess):
     if sess.query(Days).filter(Days.date == current_date).first():
@@ -50,8 +54,9 @@ def key_board_generator(user: User = None, message: types.Message = None):
     for time_slot in time_slots:
         start_time = time_slot.time_start.strftime("%H:%M")
         end_time = time_slot.time_finish.strftime("%H:%M")
-        interval_text = (f"{start_time} {end_time} {time_slot.departure_point + '-' if time_slot.departure_point else ''}"
-                         f" {time_slot.finish_point if time_slot.finish_point else ''}")
+        interval_text = (
+            f"{start_time} {end_time} {time_slot.departure_point + '-' if time_slot.departure_point else ''}"
+            f" {time_slot.finish_point if time_slot.finish_point else ''}")
         keyboard.row(types.InlineKeyboardButton(interval_text, callback_data=f"{data}{time_slot.id}"))
     return keyboard
 
@@ -64,13 +69,15 @@ def key_board_redraw(user: User = None, message: str = None):
         time_query = time_query.filter(Intervals.user == user.id, Intervals.busy == True)
     else:
         time_query = time_query.filter(Intervals.is_selected == False, Intervals.busy == False)
-    data = "select_" if message and message.startswith("select_") else "decline_" if message and message.startswith("decline_") else ""
+    data = "select_" if message and message.startswith("select_") else "decline_" if message and message.startswith(
+        "decline_") else ""
     time_slots = time_query.order_by(Intervals.id).all()
     for time_slot in time_slots:
         start_time = time_slot.time_start.strftime("%H:%M")
         end_time = time_slot.time_finish.strftime("%H:%M")
-        interval_text = (f"{start_time} {end_time} {time_slot.departure_point + '-' if time_slot.departure_point else ''}"
-                         f" {time_slot.finish_point if time_slot.finish_point else ''}")
+        interval_text = (
+            f"{start_time} {end_time} {time_slot.departure_point + '-' if time_slot.departure_point else ''}"
+            f" {time_slot.finish_point if time_slot.finish_point else ''}")
         keyboard.add(types.InlineKeyboardButton(interval_text, callback_data=f"{data}{time_slot.id}"))
     if not user:
         keyboard.add(types.InlineKeyboardButton("Продолжить", callback_data=f"accept_"))
@@ -130,7 +137,12 @@ def handle_start(message: types.Message, bot: TeleBot):
     text = ("Привет! Этот бот создан для предварительной записи на служебную машину МИАЦ \n"
             "Для того, чтобы посмотреть свободные интервалы нажмите на кнопку /free \n"
             "Для того, чтобы посмотреть выбранные Вами интервалы на сегодняшний день нажмите на кнопку /my")
-    bot.send_message(message.chat.id, text)
+    msg = bot.send_message(message.chat.id, text)
+    user = get_user_by_tg_id(message.chat.id)
+    if user:
+        bot.send_message(message.chat.id, text)
+    else:
+        pass
 
 
 def handle_button_accept(call: types.CallbackQuery, sess, bot: TeleBot):
