@@ -16,7 +16,9 @@ class Intervals(Base):
     busy = Column(Boolean, default=False)
     day = Column(Integer, ForeignKey('days.id'), nullable=False)
     user = Column(Integer, ForeignKey('user.id'), nullable=True)
-
+    is_selected = Column(Boolean, default=False)
+    departure_point = Column(String)
+    finish_point = Column(String)
 
 class Days(Base):
     __tablename__ = 'days'
@@ -44,15 +46,3 @@ class User(Base):
 # Создаем сессию для взаимодействия с базой данных
 Session = sessionmaker(bind=engine)
 session = Session()
-# # Пример добавления нового пользователя в базу данных
-# new_user = User(name='Alice')
-# session.add(new_user)
-# session.commit()
-#
-# # Пример запроса пользователей из базы данных
-# users = session.query(User).all()
-# for user in users:
-#     print(user.name, user.created_at)
-
-# Закрываем сессию
-session.close()
