@@ -6,4 +6,15 @@ def get_user_by_tg_id(tg_id: int) -> User:
     return user
 
 
+def interval_validator(intreval: Intervals):
+    for interval1, interval2 in zip(intreval, intreval[1:]):
+        if not (interval1.time_finish == interval2.time_start):
+            return False
+    return True
 
+
+def interval_cansalled(intervals):
+    for interval in intervals:
+        interval.is_selected = False
+        interval.user = None
+    session.commit()

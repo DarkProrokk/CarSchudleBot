@@ -1,14 +1,38 @@
+import datetime
+
 from database import session, Days, Intervals, User
 from datetime import time, date
 from telebot import types
-from telebot import TeleBot
-from tools import get_user_by_tg_id
+from tools import get_user_by_tg_id, interval_validator, interval_cansalled
 from sqlalchemy.orm import Session
-import threading
+import schedule
+import time as t
+from bot_init import bot
 
 current_date = date.today()
 
 timers = {}
+
+
+def new_day(session: Session):
+    next_day = current_date
+    if session.query(Days).filter(Days.date == next_day).first():
+        print("meow")
+    else:
+        new_day = Days(date=next_day)
+        session.add(new_day)
+        start_time = time(8, 0)
+        session.commit()
+        while start_time <= time(17, 00):
+            minutes = start_time.minute + 30
+            hours_to_add = minutes // 60
+            new_minutes = minutes % 60
+            end_time = time((start_time.hour + hours_to_add) % 24, new_minutes)
+            new_time_slot = Intervals(time_start=start_time, time_finish=end_time, day=new_day.id)
+            session.add(new_time_slot)
+            session.commit()
+            start_time = end_time
+        bot.send_message("879977403", f"Новый день({next_day}) создан")
 
 
 def mark_intervals_not_busy(intervals, session):
@@ -18,22 +42,12 @@ def mark_intervals_not_busy(intervals, session):
 
 
 def handle_day(message, sess):
-    if sess.query(Days).filter(Days.date == current_date).first():
-        print("meow")
-    else:
-        new_day = Days(date=current_date)
-        sess.add(new_day)
-        start_time = time(8, 0)
-        sess.commit()
-        while start_time <= time(17, 00):
-            minutes = start_time.minute + 30
-            hours_to_add = minutes // 60
-            new_minutes = minutes % 60
-            end_time = time((start_time.hour + hours_to_add) % 24, new_minutes)
-            new_time_slot = Intervals(time_start=start_time, time_finish=end_time, day=new_day.id)
-            sess.add(new_time_slot)
-            sess.commit()
-            start_time = end_time
+    new_day(sess)
+    # schedule.every().day.at("18:00").do(lambda: new_day(session))
+    # schedule.every(5).seconds.at("18:00").do(lambda: new_day(session))
+    # while True:
+    #     schedule.run_pending()
+    #     t.sleep(1)
 
 
 def key_board_generator(user: User = None, message: types.Message = None):
@@ -41,9 +55,11 @@ def key_board_generator(user: User = None, message: types.Message = None):
     curr_date = session.query(Days).filter(Days.date == current_date).first()
     if user:
         time_slots = session.query(Intervals).order_by(Intervals.id).filter(Intervals.day == curr_date.id,
-                                                                            Intervals.user == user.id).all()
+                                                                            Intervals.user == user.id,
+                                                                            Intervals.time_finish > datetime.datetime.now().time()).all()
     else:
-        time_slots = session.query(Intervals).filter(Intervals.day == curr_date.id, Intervals.busy == False).order_by(
+        time_slots = session.query(Intervals).filter(Intervals.day == curr_date.id, Intervals.busy == False,
+                                                     Intervals.time_finish > datetime.datetime.now().time()).order_by(
             Intervals.id).all()
     data = ""
     if message:
@@ -66,9 +82,11 @@ def key_board_redraw(user: User = None, message: str = None):
     curr_date = session.query(Days).filter(Days.date == current_date).first()
     time_query = session.query(Intervals).filter(Intervals.day == curr_date.id)
     if user:
-        time_query = time_query.filter(Intervals.user == user.id, Intervals.busy == True)
+        time_query = time_query.filter(Intervals.user == user.id, Intervals.busy == True,
+                                       Intervals.time_finish > datetime.datetime.now().time())
     else:
-        time_query = time_query.filter(Intervals.is_selected == False, Intervals.busy == False)
+        time_query = time_query.filter(Intervals.is_selected == False, Intervals.busy == False,
+                                       Intervals.time_finish > datetime.datetime.now().time())
     data = "select_" if message and message.startswith("select_") else "decline_" if message and message.startswith(
         "decline_") else ""
     time_slots = time_query.order_by(Intervals.id).all()
@@ -84,7 +102,7 @@ def key_board_redraw(user: User = None, message: str = None):
     return keyboard
 
 
-def send_keyboard(message, bot):
+def send_keyboard(message):
     tg_id = message.chat.id
     if not (session.query(User).filter(User.tg_id == str(tg_id)).first()):
         user = User(tg_id=tg_id, tg_username=message.chat.username, is_admin=False)
@@ -94,7 +112,7 @@ def send_keyboard(message, bot):
                      reply_markup=key_board_generator(message=message))
 
 
-def handle_button_click(call, sess, bot: TeleBot):
+def handle_button_click(call, sess):
     interval_id = int(call.data.split('_')[1])  # предполагается, что callback_data - это ID интервала
     interval = sess.get(Intervals, interval_id)
     if interval.busy == True or interval.is_selected == True:
@@ -113,7 +131,7 @@ def handle_button_click(call, sess, bot: TeleBot):
                                       reply_markup=key_board_redraw(message=call.data))
 
 
-def handle_button_click_decline(call, sess, bot):
+def handle_button_click_decline(call, sess):
     interval_id = int(call.data.split('_')[1])  # предполагается, что callback_data - это ID интервала
     interval = sess.get(Intervals, interval_id)
     tg_id = call.from_user.id
@@ -127,13 +145,13 @@ def handle_button_click_decline(call, sess, bot):
                                   reply_markup=key_board_redraw(user, call.data))
 
 
-def handle_my_intervals(message: types.Message, bot: TeleBot):
+def handle_my_intervals(message: types.Message, ):
     user = get_user_by_tg_id(message.chat.id)
     bot.send_message(message.chat.id, "Нажмите на интервалы, которые хотите отменить:",
                      reply_markup=key_board_generator(user, message=message))
 
 
-def handle_start(message: types.Message, bot: TeleBot):
+def handle_start(message: types.Message):
     text = ("Привет! Этот бот создан для предварительной записи на служебную машину МИАЦ \n"
             "Для того, чтобы посмотреть свободные интервалы нажмите на кнопку /free \n"
             "Для того, чтобы посмотреть выбранные Вами интервалы на сегодняшний день нажмите на кнопку /my")
@@ -145,34 +163,39 @@ def handle_start(message: types.Message, bot: TeleBot):
         pass
 
 
-def handle_button_accept(call: types.CallbackQuery, sess, bot: TeleBot):
-    message_text = "Выберите или введите место отправления"
-    reply_markup = types.ReplyKeyboardMarkup(one_time_keyboard=True)
-    input_field = types.KeyboardButton("Советская")
-    input_field2 = types.KeyboardButton("Истомина")
-    reply_markup.add(input_field)
-    reply_markup.add(input_field2)
-    msg = bot.send_message(call.message.chat.id, message_text, reply_markup=reply_markup)
-    # Отправляем сообщение с клавиатурами
-    bot.register_next_step_handler(msg, add_departure_point, bot, sess)
+def handle_button_accept(call: types.CallbackQuery, sess):
+    user = get_user_by_tg_id(call.message.chat.id)
+    intervals = session.query(Intervals).filter(Intervals.user == user.id, Intervals.is_selected == True).order_by(
+        Intervals.time_start).all()
+    if interval_validator(intervals):
+        message_text = "Выберите или введите место отправления"
+        reply_markup = types.ReplyKeyboardMarkup(one_time_keyboard=True)
+        input_field = types.KeyboardButton("Советская")
+        input_field2 = types.KeyboardButton("Истомина")
+        reply_markup.add(input_field)
+        reply_markup.add(input_field2)
+        msg = bot.send_message(call.message.chat.id, message_text, reply_markup=reply_markup)
+        # Отправляем сообщение с клавиатурами
+        bot.register_next_step_handler(msg, add_departure_point, sess, intervals)
+    else:
+        interval_cansalled(intervals)
+        bot.send_message(call.message.chat.id, "Нужно выбирать последовательный интервалы")
 
 
-def add_departure_point(message, bot: TeleBot, session: Session):
-    user = get_user_by_tg_id(message.chat.id)
-    intervals = session.query(Intervals).filter(Intervals.user == user.id, Intervals.is_selected == True).all()
+def add_departure_point(message, session: Session, intervals):
     for interval in intervals:
         interval.departure_point = message.text
     session.commit()
     reply_markup = types.ReplyKeyboardMarkup(one_time_keyboard=True)
-    finish_points = ["МЗХК", "Правительство", "Встэк", "Военкомат", "Казначейство"]
+    finish_points = ["МЗХК", "Правительство", "ФСТЭК", "Военкомат", "Казначейство"]
     for i in finish_points:
         finish_field = types.KeyboardButton(i)
         reply_markup.add(finish_field)
     msg = bot.send_message(message.chat.id, "Выберите или введите место назначения", reply_markup=reply_markup)
-    bot.register_next_step_handler(msg, add_finish_point, bot, session)
+    bot.register_next_step_handler(msg, add_finish_point)
 
 
-def add_finish_point(message, bot: TeleBot, session: Session):
+def add_finish_point(message):
     user = get_user_by_tg_id(message.chat.id)
     intervals = session.query(Intervals).filter(Intervals.user == user.id, Intervals.is_selected == True).all()
     for interval in intervals:
@@ -190,10 +213,10 @@ def add_finish_point(message, bot: TeleBot, session: Session):
         reply_markup.add(finish_field)
     bot.send_message(message.chat.id, text)
     msg = bot.send_message(message.chat.id, "Всё верно?", reply_markup=reply_markup)
-    bot.register_next_step_handler(msg, accept_intervals, bot, session)
+    bot.register_next_step_handler(msg, accept_intervals, session)
 
 
-def accept_intervals(message, bot: TeleBot, session: Session):
+def accept_intervals(message, session: Session):
     if message.text == 'Да':
         user = get_user_by_tg_id(message.chat.id)
         intervals = session.query(Intervals).filter(Intervals.user == user.id, Intervals.is_selected == True).all()
