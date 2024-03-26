@@ -54,6 +54,7 @@ def handler_admin_all_intervals_wrapper(message):
 
 
 while True:
+    m = "meow"
     try:
         bot.polling(none_stop=True)
         exit()  # для остановки бота через ctrl+c, не удалять!
