@@ -63,5 +63,4 @@ while True:
     except requests.exceptions.SSLError as tmp:
         print(str(tmp))
     except requests.exceptions.ConnectionError as tmp:  # Max retries exceeded with url
-
         print(str(tmp))

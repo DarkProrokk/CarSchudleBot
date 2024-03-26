@@ -64,7 +64,7 @@ def key_board_generator(user: User = None, message: types.Message = None):
                                                                             Intervals.user == user.id,
                                                                             Intervals.time_finish > datetime.datetime.now().time()).all()
     else:
-        time_slots = session.query(Intervals).filter(Intervals.day == curr_date.id, Intervals.busy == False,
+        time_slots = session.query(Intervals).filter(Intervals.day == curr_date.id, Intervals.busy == False, Intervals.is_selected == False,
                                                      Intervals.time_finish > datetime.datetime.now().time()).order_by(
             Intervals.id).all()
     data = ""
@@ -197,15 +197,17 @@ def add_finish_point(message):
 
 
 def accept_intervals(message, session: Session):
+    user = get_user_by_tg_id(message.chat.id)
+    intervals = session.query(Intervals).filter(Intervals.user == user.id, Intervals.is_selected == True).all()
     if message.text == 'Да':
-        user = get_user_by_tg_id(message.chat.id)
-        intervals = session.query(Intervals).filter(Intervals.user == user.id, Intervals.is_selected == True).all()
         for interval in intervals:
             interval.busy = True
             interval.is_selected = False
         session.commit()
         bot.send_message(message.chat.id, "Интервалы записаны")
-
+    else:
+        interval_cansalled(intervals)
+        bot.send_message(message.chat.id, "Интервалы отменены")
 
 # endregion
 

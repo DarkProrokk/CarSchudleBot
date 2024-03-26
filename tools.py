@@ -18,6 +18,8 @@ def interval_cansalled(intervals):
     for interval in intervals:
         interval.is_selected = False
         interval.user = None
+        interval.departure_point = None
+        interval.finish_point = None
     session.commit()
 
 
