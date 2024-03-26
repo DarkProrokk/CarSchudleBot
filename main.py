@@ -34,7 +34,7 @@ def handle_button_click_wrapper(call):
 @bot.callback_query_handler(func=lambda call: call.data.startswith('decline_'))
 def handle_button_click_decline_wrapper(call):
     with Session() as session:
-        handle_button_click_decline(call, session)
+        handle_button_click_decline(call)
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('accept_'))

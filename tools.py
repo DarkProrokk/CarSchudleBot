@@ -1,4 +1,5 @@
-from database import session, User, Intervals
+from database import session, User, Intervals, IntervalGroup
+from datetime import datetime
 
 
 def get_user_by_tg_id(tg_id: int) -> User:
@@ -18,3 +19,41 @@ def interval_cansalled(intervals):
         interval.is_selected = False
         interval.user = None
     session.commit()
+
+
+def interval_combiner(intervals):
+    group = IntervalGroup(created_at=datetime.now())
+    session.add(group)
+    session.commit()
+    for interval in intervals:
+        interval.group_id = group.id
+    session.commit()
+    
+    
+def interval_decliner_by_group(group_id):
+    intervals = session.query(Intervals).filter(Intervals.group_id == group_id).all()
+    for interval in intervals:
+        interval.busy = False
+        interval.user = None
+        interval.group_id = None
+        interval.finish_point = None
+        interval.departure_point = None
+    session.commit()
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    

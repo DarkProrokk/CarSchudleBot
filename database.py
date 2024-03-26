@@ -19,6 +19,8 @@ class Intervals(Base):
     is_selected = Column(Boolean, default=False)
     departure_point = Column(String)
     finish_point = Column(String)
+    group_id = Column(Integer, ForeignKey('intervalgroup.id'), nullable=True)
+
 
 class Days(Base):
     __tablename__ = 'days'
@@ -26,11 +28,10 @@ class Days(Base):
     date = Column(Date)
 
 
-class Schedule(Base):
-    __tablename__ = 'schedules'
+class IntervalGroup(Base):
+    __tablename__ = 'intervalgroup'
 
     id = Column(Integer, primary_key=True)
-    name = Column(String)
     created_at = Column(DateTime, default=datetime.now)
 
 
