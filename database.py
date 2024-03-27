@@ -30,7 +30,6 @@ class Days(Base):
 
 class IntervalGroup(Base):
     __tablename__ = 'intervalgroup'
-
     id = Column(Integer, primary_key=True)
     created_at = Column(DateTime, default=datetime.now)
 

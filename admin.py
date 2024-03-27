@@ -2,7 +2,6 @@ from telebot import types
 from tools import get_user_by_tg_id, interval_decliner_by_group, get_intervals_by_group_choices
 from bot_init import bot
 from kb import admin_key_board, admin_choice_keyboard
-from database import session, Intervals, User
 
 
 def handler_admin_all_intervals(message: types.Message):
@@ -38,7 +37,6 @@ def handle_admin_choice_dicline(call: types.CallbackQuery):
 
 
 def handle_admin_choice_ready(call: types.CallbackQuery):
-    group_id = int(call.data.split('_')[1])
     user_tg_id = int(call.data.split('_')[2])
     interval = get_intervals_by_group_choices(call)
     bot.delete_message(call.message.chat.id, call.message.message_id)
@@ -48,7 +46,6 @@ def handle_admin_choice_ready(call: types.CallbackQuery):
 
 
 def handle_admin_choice_late(call: types.CallbackQuery):
-    group_id = int(call.data.split('_')[1])
     user_tg_id = int(call.data.split('_')[2])
     interval = get_intervals_by_group_choices(call)
     bot.delete_message(call.message.chat.id, call.message.message_id)
