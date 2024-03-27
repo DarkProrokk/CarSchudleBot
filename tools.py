@@ -1,6 +1,7 @@
 from database import session, User, Intervals, IntervalGroup
 from datetime import datetime
 from typing import List
+from datetime import date, timedelta
 
 
 def get_user_by_tg_id(tg_id: int) -> User:
@@ -46,7 +47,6 @@ def interval_decliner_by_group(group_id):
 
 def get_intervals_by_group_choices(call):
     group_id = int(call.data.split('_')[1])
-    user_tg_id = int(call.data.split('_')[2])
     interval = (session.query(Intervals.departure_point,
                               Intervals.finish_point)
                 .select_from(Intervals)
@@ -54,3 +54,11 @@ def get_intervals_by_group_choices(call):
                 .filter(Intervals.group_id == group_id)
                 .first())
     return interval
+
+
+def get_current_date() -> date:
+    return date.today()
+
+
+def get_next_date() -> date:
+    return date.today() + timedelta(days=1)
