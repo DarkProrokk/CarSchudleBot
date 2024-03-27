@@ -3,7 +3,8 @@ import datetime
 from database import session, Days, Intervals, User
 from datetime import time, date
 from telebot import types
-from tools import get_user_by_tg_id, interval_validator, interval_cansalled, interval_combiner, interval_decliner_by_group
+from tools import get_user_by_tg_id, interval_validator, interval_cancaller, interval_combiner, \
+    interval_decliner_by_group
 from sqlalchemy.orm import Session
 
 from bot_init import bot
@@ -13,6 +14,18 @@ from kb import my_key_board
 current_date = date.today()
 
 timers = {}
+
+
+def handle_start(message: types.Message):
+    text = ("Привет! Этот бот создан для предварительной записи на служебную машину МИАЦ \n"
+            "Для того, чтобы посмотреть свободные интервалы нажмите на кнопку /free \n"
+            "Для того, чтобы посмотреть выбранные Вами интервалы на сегодняшний день нажмите на кнопку /my")
+    msg = bot.send_message(message.chat.id, text)
+    user = get_user_by_tg_id(message.chat.id)
+    if user:
+        bot.send_message(message.chat.id, text)
+    else:
+        pass
 
 
 def mark_intervals_not_busy(intervals, session):
@@ -64,7 +77,8 @@ def key_board_generator(user: User = None, message: types.Message = None):
                                                                             Intervals.user == user.id,
                                                                             Intervals.time_finish > datetime.datetime.now().time()).all()
     else:
-        time_slots = session.query(Intervals).filter(Intervals.day == curr_date.id, Intervals.busy == False, Intervals.is_selected == False,
+        time_slots = session.query(Intervals).filter(Intervals.day == curr_date.id, Intervals.busy == False,
+                                                     Intervals.is_selected == False,
                                                      Intervals.time_finish > datetime.datetime.now().time()).order_by(
             Intervals.id).all()
     data = ""
@@ -143,6 +157,7 @@ def handle_button_click(call, sess):
 
 
 def handle_button_accept(call: types.CallbackQuery, sess):
+    bot.delete_message(call.message.chat.id, call.message.message_id)
     user = get_user_by_tg_id(call.message.chat.id)
     intervals = session.query(Intervals).filter(Intervals.user == user.id, Intervals.is_selected == True).order_by(
         Intervals.time_start).all()
@@ -158,7 +173,7 @@ def handle_button_accept(call: types.CallbackQuery, sess):
         # Отправляем сообщение с клавиатурами
         bot.register_next_step_handler(msg, add_departure_point, sess, intervals)
     else:
-        interval_cansalled(intervals)
+        interval_cancaller(intervals)
         bot.send_message(call.message.chat.id, "Нужно выбирать последовательный интервалы")
 
 
@@ -193,10 +208,10 @@ def add_finish_point(message):
         reply_markup.add(finish_field)
     bot.send_message(message.chat.id, text)
     msg = bot.send_message(message.chat.id, "Всё верно?", reply_markup=reply_markup)
-    bot.register_next_step_handler(msg, accept_intervals, session)
+    bot.register_next_step_handler(msg, accept_intervals)
 
 
-def accept_intervals(message, session: Session):
+def accept_intervals(message):
     user = get_user_by_tg_id(message.chat.id)
     intervals = session.query(Intervals).filter(Intervals.user == user.id, Intervals.is_selected == True).all()
     if message.text == 'Да':
@@ -206,8 +221,8 @@ def accept_intervals(message, session: Session):
         session.commit()
         bot.send_message(message.chat.id, "Интервалы записаны")
     else:
-        interval_cansalled(intervals)
-        bot.send_message(message.chat.id, "Интервалы отменены")
+        interval_cancaller(intervals)
+
 
 # endregion
 
@@ -226,15 +241,3 @@ def handle_my_intervals(message: types.Message, ):
     key = my_key_board(user.id)
     bot.send_message(message.chat.id, "Нажмите на интервалы, которые хотите отменить:",
                      reply_markup=key)
-
-
-def handle_start(message: types.Message):
-    text = ("Привет! Этот бот создан для предварительной записи на служебную машину МИАЦ \n"
-            "Для того, чтобы посмотреть свободные интервалы нажмите на кнопку /free \n"
-            "Для того, чтобы посмотреть выбранные Вами интервалы на сегодняшний день нажмите на кнопку /my")
-    msg = bot.send_message(message.chat.id, text)
-    user = get_user_by_tg_id(message.chat.id)
-    if user:
-        bot.send_message(message.chat.id, text)
-    else:
-        pass

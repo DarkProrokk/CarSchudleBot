@@ -1,5 +1,6 @@
 from database import session, User, Intervals, IntervalGroup
 from datetime import datetime
+from typing import List
 
 
 def get_user_by_tg_id(tg_id: int) -> User:
@@ -7,14 +8,14 @@ def get_user_by_tg_id(tg_id: int) -> User:
     return user
 
 
-def interval_validator(intreval: Intervals):
-    for interval1, interval2 in zip(intreval, intreval[1:]):
+def interval_validator(interval: List[Intervals]):
+    for interval1, interval2 in zip(interval, interval[1:]):
         if not (interval1.time_finish == interval2.time_start):
             return False
     return True
 
 
-def interval_cansalled(intervals):
+def interval_cancaller(intervals):
     for interval in intervals:
         interval.is_selected = False
         interval.user = None
@@ -30,8 +31,8 @@ def interval_combiner(intervals):
     for interval in intervals:
         interval.group_id = group.id
     session.commit()
-    
-    
+
+
 def interval_decliner_by_group(group_id):
     intervals = session.query(Intervals).filter(Intervals.group_id == group_id).all()
     for interval in intervals:
@@ -41,21 +42,15 @@ def interval_decliner_by_group(group_id):
         interval.finish_point = None
         interval.departure_point = None
     session.commit()
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+
+
+def get_intervals_by_group_choices(call):
+    group_id = int(call.data.split('_')[1])
+    user_tg_id = int(call.data.split('_')[2])
+    interval = (session.query(Intervals.departure_point,
+                              Intervals.finish_point)
+                .select_from(Intervals)
+                .join(User, Intervals.user == User.id)  # Join the Intervals and User tables
+                .filter(Intervals.group_id == group_id)
+                .first())
+    return interval
