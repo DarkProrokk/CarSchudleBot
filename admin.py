@@ -29,11 +29,15 @@ def handle_admin_choice(call: types.CallbackQuery):
 def handle_admin_choice_dicline(call: types.CallbackQuery):
     group_id = int(call.data.split('_')[1])
     user_tg_id = int(call.data.split('_')[2])
+    username = get_user_by_tg_id(user_tg_id).tg_username
     interval = get_intervals_by_group_choices(call)
     interval_decliner_by_group(group_id)
     bot.delete_message(call.message.chat.id, call.message.message_id)
     bot.send_message(user_tg_id, f"Интервал {interval.departure_point} - {interval.finish_point} отменен")
-    bot.send_message(call.message.chat.id, f"Интервал {interval.departure_point} - {interval.finish_point} отменён")
+    bot.send_message(call.message.chat.id, f"Интервал || {interval.departure_point} - {interval.finish_point}  || "
+                                           f"отменён, для уточнения причины напишите пользователю @{username} \n"
+                                           f"Посмотреть занятое расписание на сегодняшний день можно при помощи команды"
+                                           f" /today")
 
 
 def handle_admin_choice_ready(call: types.CallbackQuery):
