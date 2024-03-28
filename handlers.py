@@ -4,13 +4,23 @@ from database import session, Days, Intervals, User
 from datetime import time
 from telebot import types
 from tools import get_user_by_tg_id, interval_validator, interval_cancaller, interval_combiner, \
-    interval_decliner_by_group, get_current_date, get_next_date
+    interval_decliner_by_group, get_current_date
 from text import TEXT_START
 from bot_init import bot
 import time as t
 from kb import my_key_board
+import threading
 
 timers = {}
+
+
+def mark_intervals_not_selected(user):
+    intervals = session.query(Intervals).filter(Intervals.user == user.id, Intervals.is_selected == True).all()
+    if int(user.tg_id) in timers:
+        del timers[int(user.tg_id)]
+    interval_cancaller(intervals)
+    session.commit()
+    print("Таймер отработал")
 
 
 def handle_start(message: types.Message):
@@ -32,7 +42,7 @@ def register_user(message: types.Message):
 # region new_day
 
 def new_day():
-    next_day = get_next_date()
+    next_day = get_current_date()
     if session.query(Days).filter(Days.date == next_day).first():
         print("meow")
     else:
@@ -54,10 +64,16 @@ def new_day():
 
 
 def handle_day():
-    schedule.every().day.at("18:00").do(new_day)
+    if session.query(Days).filter(Days.date == get_current_date()).first():
+        pass
+    else:
+        new_day()
+    bot.send_message("879977403", "Бот был перезапущен. Функция генерации дня работает.")
+    schedule.every().day.at("09:27").do(new_day)
     while True:
         schedule.run_pending()
-        t.sleep(40)
+        print("meowtest")
+        t.sleep(20)
 
 
 # endregion
@@ -115,6 +131,7 @@ def key_board_redraw(user: User = None, message: str = None):
         keyboard.add(types.InlineKeyboardButton(interval_text, callback_data=f"{data}{time_slot.id}"))
     if not user:
         keyboard.add(types.InlineKeyboardButton("Продолжить", callback_data=f"accept_"))
+        keyboard.add(types.InlineKeyboardButton("Отменить все выбранные интервалы", callback_data=f"cancel_"))
     return keyboard
 
 
@@ -122,7 +139,7 @@ def key_board_redraw(user: User = None, message: str = None):
 
 # region interval_selector
 
-def handle_button_click(call, sess):
+def handle_button_click(call: types.CallbackQuery, sess):
     interval_id = int(call.data.split('_')[1])  # предполагается, что callback_data - это ID интервала
     interval = sess.get(Intervals, interval_id)
     if interval.busy == True or interval.is_selected == True:
@@ -135,10 +152,19 @@ def handle_button_click(call, sess):
         interval.is_selected = True
         interval.user = user.id
         sess.commit()
-        # intervals = sess.query(Intervals).filter(Intervals.user == user.id, Intervals.is_selected == True).all()
-        # timers[call.message.chat.id] = threading.Timer(60, mark_intervals_not_busy, args=[intervals, session])
+        if call.message.chat.id not in timers:
+            t = threading.Timer(120, mark_intervals_not_selected, args=[user])
+            t.start()
+            timers[call.message.chat.id] = t
         bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id,
                                       reply_markup=key_board_redraw(message=call.data))
+
+
+def handler_cancel_intervals(call: types.CallbackQuery):
+    user = get_user_by_tg_id(call.message.chat.id)
+    mark_intervals_not_selected(user)
+    bot.send_message(call.message.chat.id, "Все выбранные интервалы отменены \n"
+                                           "Посмотреть свободные /free")
 
 
 def handle_button_accept(call: types.CallbackQuery):
@@ -177,15 +203,15 @@ def add_departure_point(message, intervals):
 
 def add_finish_point(message):
     user = get_user_by_tg_id(message.chat.id)
-    intervals = session.query(Intervals).filter(Intervals.user == user.id, Intervals.is_selected == True).all()
+    intervals = session.query(Intervals).order_by(Intervals.time_start).filter(Intervals.user == user.id,
+                                                                               Intervals.is_selected == True).all()
     for interval in intervals:
         interval.finish_point = message.text
     session.commit()
     text = 'Ваши интервалы: \n'
-    for interval in intervals:
-        start_time = interval.time_start.strftime("%H:%M")
-        end_time = interval.time_finish.strftime("%H:%M")
-        text += f"{start_time} - {end_time} {interval.departure_point} - {interval.finish_point} \n"
+    start_time = intervals[0].time_start.strftime("%H:%M")
+    end_time = intervals[-1].time_finish.strftime("%H:%M")
+    text += f"{start_time} - {end_time} {intervals[0].departure_point} - {intervals[0].finish_point} \n"
     reply_markup = types.ReplyKeyboardMarkup(one_time_keyboard=True)
     finish_points = ["Да", "Нет"]
     for i in finish_points:
