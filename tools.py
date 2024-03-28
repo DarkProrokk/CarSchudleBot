@@ -22,10 +22,20 @@ def interval_cancaller(intervals):
         interval.user = None
         interval.departure_point = None
         interval.finish_point = None
+        interval.group_id = None
     session.commit()
 
 
 def interval_combiner(intervals):
+    """Скомбинировать интервалы по группе.
+
+    Эта функция комбинирует(или правильнее сказать группирует)
+    переданные интервалы, добавления им одинаковую группу
+    Args:
+         intervals (List[Interval]): Список интервалов, которые необходимо сгруппировать
+    Returns:
+        None
+    """
     group = IntervalGroup(created_at=datetime.now())
     session.add(group)
     session.commit()
@@ -57,7 +67,11 @@ def get_intervals_by_group_choices(call):
 
 
 def get_current_date() -> date:
-    return date.today()
+    now = datetime.now()
+    if now.hour >= 18:
+        return date.today() + timedelta(days=1)
+    else:
+        return date.today()
 
 
 def get_next_date() -> date:

@@ -6,7 +6,7 @@ from bot_init import bot
 from admin import (handler_admin_all_intervals, handle_admin_choice, handle_admin_choice_late,
                    handle_admin_choice_ready, handle_admin_choice_dicline)
 from handlers import handle_day, send_keyboard, handle_button_click, handle_my_intervals, handle_button_click_decline, \
-    handle_start, handle_button_accept
+    handle_start, handle_button_accept, handler_cancel_intervals
 import logging
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -39,6 +39,16 @@ def handle_button_click_decline_wrapper(call):
     handle_button_click_decline(call)
 
 
+@bot.callback_query_handler(func=lambda call: call.data.startswith('cancel_'))
+def handler_cancel_intervals_wrapper(call):
+    handler_cancel_intervals(call)
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('decline_'))
+def handle_button_click_decline_wrapper(call):
+    handle_button_click_decline(call)
+
+
 @bot.callback_query_handler(func=lambda call: call.data.startswith('declineA_'))
 def handle_button_click_decline_wrapper(call):
     handle_admin_choice_dicline(call)
@@ -46,8 +56,7 @@ def handle_button_click_decline_wrapper(call):
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('accept_'))
 def handle_button_accept_wrapper(call):
-    with Session() as session:
-        handle_button_accept(call)
+    handle_button_accept(call)
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('choice_'))
@@ -83,7 +92,7 @@ def start_bot():
         bot.polling(none_stop=True)
     except Exception as e:
         logging.info(f"Произошла ошибка {e}")
-        time.sleep(5)
+        time.sleep(1)
         start_bot()
 
 
