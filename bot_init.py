@@ -1,5 +1,9 @@
 import telebot
-
-bot = telebot.TeleBot('7149731991:AAGqqJ06q5qckoXUy192GCnG2c8qfpBkZ34', skip_pending=True)
+from dotenv import load_dotenv
+import os
+import os
+load_dotenv(".env.dev")
+apiKey = os.getenv("BOT_TOKEN")
+bot = telebot.TeleBot(apiKey, skip_pending=True)
 
 
