@@ -2,7 +2,7 @@ from database import session, User, Intervals, IntervalGroup
 from datetime import datetime
 from typing import List
 from datetime import date, timedelta
-
+import re
 
 def get_user_by_tg_id(tg_id: int) -> User:
     user = (session.query(User).filter(User.tg_id == str(tg_id)).first())
@@ -74,5 +74,5 @@ def get_current_date() -> date:
         return date.today()
 
 
-def get_next_date() -> date:
-    return date.today() + timedelta(days=1)
+def check_characters(input_string):
+    return bool(re.search(r'[^а-яА-Я0-9, ]', input_string))
