@@ -1,12 +1,10 @@
 import time
-
-import requests
 from database import Session
 from bot_init import bot
 from admin import (handler_admin_all_intervals, handle_admin_choice, handle_admin_choice_late,
                    handle_admin_choice_ready, handle_admin_choice_dicline)
 from handlers import handle_day, send_keyboard, handle_button_click, handle_my_intervals, handle_button_click_decline, \
-    handle_start, handle_button_accept, handler_cancel_intervals
+    handle_start, handle_button_accept, handler_cancel_intervals, handle_change_surname, handle_help
 import logging
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -84,6 +82,16 @@ def handle_my_intervals_wrapper(message):
 def handler_admin_all_intervals_wrapper(message):
     logging.info(f"Пользователь {message.from_user.username} посмотрел активные за весь день")
     handler_admin_all_intervals(message)
+
+
+@bot.message_handler(commands=['help'])
+def handle_help_wrapper(message):
+    handle_help(message)
+
+
+@bot.message_handler(commands=['surname'])
+def handle_change_surname_wrapper(message):
+    handle_change_surname(message)
 
 
 def start_bot():

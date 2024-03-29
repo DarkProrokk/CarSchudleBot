@@ -4,8 +4,8 @@ from database import session, Days, Intervals, User
 from datetime import time
 from telebot import types
 from tools import get_user_by_tg_id, interval_validator, interval_cancaller, interval_combiner, \
-    interval_decliner_by_group, get_current_date
-from text import TEXT_START
+    interval_decliner_by_group, get_current_date, check_characters
+from text import TEXT_START, TEXT_HELP
 from bot_init import bot
 import time as t
 from kb import my_key_board
@@ -24,19 +24,18 @@ def mark_intervals_not_selected(user):
 
 
 def handle_start(message: types.Message):
-    text = TEXT_START
     user = get_user_by_tg_id(message.chat.id)
     if user:
-        bot.send_message(message.chat.id, text)
+        bot.send_message(message.chat.id, TEXT_HELP)
     else:
-        bot.register_next_step_handler(bot.send_message(message.chat.id, "Введите ваше фио"), register_user)
+        bot.register_next_step_handler(bot.send_message(message.chat.id, TEXT_START), register_user)
 
 
 def register_user(message: types.Message):
     user = User(tg_id=message.chat.id, tg_username=message.chat.username, surname=message.text)
     session.add(user)
     session.commit()
-    bot.send_message(message.chat.id, "Вы успешно зарегистрированы \n \n" + TEXT_START)
+    bot.send_message(message.chat.id, "Вы успешно зарегистрированы \n \n" + TEXT_HELP)
 
 
 # region new_day
@@ -69,7 +68,7 @@ def handle_day():
     else:
         new_day()
     bot.send_message("879977403", "Бот был перезапущен. Функция генерации дня работает.")
-    schedule.every().day.at("09:27").do(new_day)
+    schedule.every().day.at("18:01").do(new_day)
     while True:
         schedule.run_pending()
         print("meowtest")
@@ -178,8 +177,10 @@ def handle_button_accept(call: types.CallbackQuery):
         reply_markup = types.ReplyKeyboardMarkup(one_time_keyboard=True)
         input_field = types.KeyboardButton("Советская")
         input_field2 = types.KeyboardButton("Истомина")
+        input_field3 = types.KeyboardButton("Назад")
         reply_markup.add(input_field)
         reply_markup.add(input_field2)
+        reply_markup.add(input_field3)
         msg = bot.send_message(call.message.chat.id, message_text, reply_markup=reply_markup)
         # Отправляем сообщение с клавиатурами
         bot.register_next_step_handler(msg, add_departure_point, intervals)
@@ -189,6 +190,17 @@ def handle_button_accept(call: types.CallbackQuery):
 
 
 def add_departure_point(message, intervals):
+    if check_characters(message.text):
+        bot.send_message(message.chat.id, "Введён некорректный адрес")
+        interval_cancaller(intervals)
+        message.text = "/free"
+        send_keyboard(message)
+        return
+    if message.text == "Назад":
+        message.text = "/free"
+        interval_cancaller(intervals)
+        send_keyboard(message)
+        return
     for interval in intervals:
         interval.departure_point = message.text
     session.commit()
@@ -205,6 +217,12 @@ def add_finish_point(message):
     user = get_user_by_tg_id(message.chat.id)
     intervals = session.query(Intervals).order_by(Intervals.time_start).filter(Intervals.user == user.id,
                                                                                Intervals.is_selected == True).all()
+    if check_characters(message.text):
+        bot.send_message(message.chat.id, "Введён некорректный адрес")
+        interval_cancaller(intervals)
+        message.text = "/free"
+        send_keyboard(message)
+        return
     for interval in intervals:
         interval.finish_point = message.text
     session.commit()
@@ -225,14 +243,19 @@ def add_finish_point(message):
 def accept_intervals(message):
     user = get_user_by_tg_id(message.chat.id)
     intervals = session.query(Intervals).filter(Intervals.user == user.id, Intervals.is_selected == True).all()
-    if message.text == 'Да':
+    if message.text.startswith('Да'):
         for interval in intervals:
             interval.busy = True
             interval.is_selected = False
         session.commit()
         bot.send_message(message.chat.id, "Интервалы записаны")
-    else:
+
+    elif message.text.startswith('Нет'):
         interval_cancaller(intervals)
+        message.text = "/free"
+        send_keyboard(message)
+    else:
+        bot.register_next_step_handler(bot.send_message(message.chat.id, "Введите Да или Нет"), accept_intervals)
 
 
 # endregion
@@ -243,7 +266,10 @@ def send_keyboard(message):
         user = User(tg_id=tg_id, tg_username=message.chat.username, is_admin=False)
         session.add(user)
         session.commit()
-    bot.send_message(message.chat.id, "Выберите временной интервал:",
+    bot.send_message(message.chat.id,
+                     f"Сегодня {get_current_date().day}.{get_current_date().month:02d}\n"
+                     "Выберите один или несколько интервалов\n"
+                     "Важно! Выбирать нужно последовательные по времени интервалы",
                      reply_markup=key_board_generator(message=message))
 
 
@@ -261,3 +287,20 @@ def handle_my_intervals(message: types.Message, ):
     key = my_key_board(user.id)
     bot.send_message(message.chat.id, "Нажмите на интервалы, которые хотите отменить:",
                      reply_markup=key)
+
+
+def handle_help(message: types.Message):
+    bot.send_message(message.chat.id, TEXT_HELP)
+
+
+def handle_change_surname(message: types.Message):
+    bot.send_message(message.chat.id, "Введите фамилию:")
+    bot.register_next_step_handler(message, change_surname)
+
+
+def change_surname(message: types.Message):
+    user = get_user_by_tg_id(message.chat.id)
+    user.surname = message.text
+    session.commit()
+    bot.send_message(message.chat.id, f"Фамилия изменена, текущая фамилия: \n"
+                                      f"{user.surname}")
