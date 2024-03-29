@@ -1,7 +1,8 @@
 from telebot import types
-from database import Intervals, User
+from database import Intervals, User, Days
 from database import session
 from sqlalchemy import func
+from tools import get_current_date
 
 
 def my_key_board(user_id) -> types.InlineKeyboardMarkup:
@@ -21,23 +22,25 @@ def my_key_board(user_id) -> types.InlineKeyboardMarkup:
 
 
 def admin_key_board() -> types.InlineKeyboardMarkup:
+    curr_date = session.query(Days).filter(Days.date == get_current_date()).first()
     results = (session.query(Intervals.group_id,
                              func.min(Intervals.time_start).label('min_time_start'),
                              func.max(Intervals.time_finish).label('max_time_finish'),
                              Intervals.departure_point,
                              Intervals.finish_point,
-                             User.tg_username,
+                             User.surname,
                              User.tg_id)
                .select_from(Intervals)
                .join(User, Intervals.user == User.id)  # Join the Intervals and User tables
-               .filter(Intervals.busy)
-               .group_by(Intervals.group_id, Intervals.departure_point, Intervals.finish_point, User.tg_username, User.tg_id)
+               .filter(Intervals.busy, Intervals.day == curr_date.id)
+               .group_by(Intervals.group_id, Intervals.departure_point, Intervals.finish_point, User.surname,
+                         User.tg_id)
                .order_by('min_time_start')
                .all())
     reply_markup = types.InlineKeyboardMarkup()
     for interval in results:
         text = (f'| {interval[1].strftime("%H:%M")} - {interval[2].strftime("%H:%M")} | - | {interval[3]} - '
-                f'{interval[4]} | - @{interval[5]}')
+                f'{interval[4]} | - {interval[5] if interval[5] else ""} |')
         reply_markup.add(types.InlineKeyboardButton(text, callback_data=f"choice_{interval[0]}_{interval[6]}"))
     return reply_markup
 
