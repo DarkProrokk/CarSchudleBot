@@ -304,6 +304,3 @@ def change_surname(message: types.Message):
     session.commit()
     bot.send_message(message.chat.id, f"Фамилия изменена, текущая фамилия: \n"
                                       f"{user.surname}")
-
-def test():
-    pass
