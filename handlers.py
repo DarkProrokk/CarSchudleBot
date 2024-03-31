@@ -68,6 +68,8 @@ def handle_day():
     else:
         new_day()
     bot.send_message("879977403", "Бот был перезапущен. Функция генерации дня работает.")
+    if schedule.jobs:
+        return
     schedule.every().day.at("18:01").do(new_day)
     while True:
         schedule.run_pending()
@@ -244,6 +246,8 @@ def accept_intervals(message):
     user = get_user_by_tg_id(message.chat.id)
     intervals = session.query(Intervals).filter(Intervals.user == user.id, Intervals.is_selected == True).all()
     if message.text.startswith('Да'):
+        if int(user.tg_id) in timers:
+            del timers[int(user.tg_id)]
         for interval in intervals:
             interval.busy = True
             interval.is_selected = False
@@ -267,7 +271,7 @@ def send_keyboard(message):
         session.add(user)
         session.commit()
     bot.send_message(message.chat.id,
-                     f"Сегодня {get_current_date().day}.{get_current_date().month:02d}\n"
+                     f"Расписание на {get_current_date().day:02d}.{get_current_date().month:02d}\n"
                      "Выберите один или несколько интервалов\n"
                      "Важно! Выбирать нужно последовательные по времени интервалы",
                      reply_markup=key_board_generator(message=message))
